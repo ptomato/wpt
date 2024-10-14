@@ -555,6 +555,13 @@ class ShadowRealmInDedicatedWorkerHandler(WorkersHandler):
                      ".any.worker-shadowrealm.js")]
 
 
+class ShadowRealmInSharedWorkerHandler(SharedWorkersHandler):
+    global_type = "shadowrealm-in-sharedworker"
+    path_replace = [(".any.shadowrealm-in-sharedworker.html",
+                     ".any.js",
+                     ".any.worker-shadowrealm.js")]
+
+
 class BaseWorkerHandler(WrapperHandler):
     headers = [('Content-Type', 'text/javascript')]
 
@@ -617,6 +624,12 @@ class ShadowRealmWorkerWrapperHandler(BaseWorkerHandler):
     path_replace = [(".any.worker-shadowrealm.js", ".any.js")]
     wrapper = """%(meta)s
 importScripts("/resources/testharness.js");
+
+// for SharedWorker
+let port;
+onconnect = function (event) {
+  port = event.ports[0];
+}
 """ + fetch_json_shadow_realm_adaptor_js_code + """
 const r = new ShadowRealm();
 r.evaluate(`
@@ -632,7 +645,13 @@ new Promise(r.evaluate(`
 }
 `)).then(() => {
   function forwardMessage(msgJSON) {
-    postMessage(JSON.parse(msgJSON));
+    if (typeof postMessage === 'function') {
+      postMessage(JSON.parse(msgJSON));
+    } else if (typeof port === 'object') {
+      port.postMessage(JSON.parse(msgJSON));
+    } else {
+      throw new Error('no way to forward message from ShadowRealm');
+    }
   }
   r.evaluate('begin_shadow_realm_tests')(forwardMessage);
 });
@@ -701,6 +720,7 @@ class RoutesBuilder:
             ("GET", "*.any.shadowrealm-in-window.html", ShadowRealmInWindowHandler),
             ("GET", "*.any.shadowrealm-in-shadowrealm.html", ShadowRealmInShadowRealmHandler),
             ("GET", "*.any.shadowrealm-in-dedicatedworker.html", ShadowRealmInDedicatedWorkerHandler),
+            ("GET", "*.any.shadowrealm-in-sharedworker.html", ShadowRealmInSharedWorkerHandler),
             ("GET", "*.any.window-module.html", WindowModulesHandler),
             ("GET", "*.any.worker.js", ClassicWorkerHandler),
             ("GET", "*.any.worker-module.js", ModuleWorkerHandler),

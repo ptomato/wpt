@@ -562,6 +562,13 @@ class ShadowRealmInSharedWorkerHandler(SharedWorkersHandler):
                      ".any.worker-shadowrealm.js")]
 
 
+class ShadowRealmInServiceWorkerHandler(ServiceWorkersHandler):
+    global_type = "shadowrealm-in-serviceworker"
+    path_replace = [(".https.any.shadowrealm-in-serviceworker.html",
+                     ".any.js",
+                     ".any.worker-shadowrealm.js")]
+
+
 class BaseWorkerHandler(WrapperHandler):
     headers = [('Content-Type', 'text/javascript')]
 
@@ -630,6 +637,15 @@ let port;
 onconnect = function (event) {
   port = event.ports[0];
 }
+
+// for ServiceWorker
+async function getClient() {
+  if (typeof clients === 'undefined')
+    return;
+  const allClients = await clients.matchAll({ includeUncontrolled: true });
+  port = allClients[0];
+}
+
 """ + fetch_json_shadow_realm_adaptor_js_code + """
 const r = new ShadowRealm();
 r.evaluate(`
@@ -643,7 +659,7 @@ new Promise(r.evaluate(`
     await import("%(path)s");
   })().then(resolve, (e) => reject(e.toString()));
 }
-`)).then(() => {
+`)).then(() => getServiceWorkerClient()).then(() => {
   function forwardMessage(msgJSON) {
     if (typeof postMessage === 'function') {
       postMessage(JSON.parse(msgJSON));
@@ -721,6 +737,7 @@ class RoutesBuilder:
             ("GET", "*.any.shadowrealm-in-shadowrealm.html", ShadowRealmInShadowRealmHandler),
             ("GET", "*.any.shadowrealm-in-dedicatedworker.html", ShadowRealmInDedicatedWorkerHandler),
             ("GET", "*.any.shadowrealm-in-sharedworker.html", ShadowRealmInSharedWorkerHandler),
+            ("GET", "*.any.shadowrealm-in-serviceworker.html", ShadowRealmInServiceWorkerHandler),
             ("GET", "*.any.window-module.html", WindowModulesHandler),
             ("GET", "*.any.worker.js", ClassicWorkerHandler),
             ("GET", "*.any.worker-module.js", ModuleWorkerHandler),
